@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>UNO Online Pro Max</title>
+
+<style>
+body{
+  margin:0;
+  background: radial-gradient(circle at center, #1a1a1a 0%, #0d0d0d 70%);
+  font-family: Arial Black;
+  color:white;
+  text-align:center;
+}
+
+#loginScreen{ margin-top:100px; }
+
+input,button{
+  padding:10px;
+  border-radius:10px;
+  border:none;
+  margin:5px;
+}
+
+button{
+  background:#FFD700;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+#game{ display:none; }
+
+.card{
+  width:70px;
+  height:100px;
+  border-radius:14px;
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  font-size:22px;
+  margin:5px;
+  cursor:pointer;
+}
+
+.red{ background:#FF0000; }
+.blue{ background:#0066FF; }
+.green{ background:#00AA00; }
+.yellow{ background:#FFD700; color:black; }
+</style>
+</head>
+
+<body>
+
+<div id="loginScreen">
+  <h1>UNO ONLINE PRO MAX</h1>
+  <input id="nameInput" placeholder="Masukkan Nama">
+  <button onclick="login()">Login</button>
+</div>
+
+<div id="game">
+  <h2 id="playerInfo"></h2>
+
+  <button onclick="createRoom()">Buat Room</button>
+  <input id="roomInput" placeholder="Room ID">
+  <button onclick="joinRoom()">Join Room</button>
+
+  <h3>Discard:</h3>
+  <div id="discard"></div>
+
+  <h3>Kartu Kamu:</h3>
+  <div id="hand"></div>
+
+  <h3>Chat</h3>
+  <div id="chatBox"></div>
+  <input id="chatInput" placeholder="Ketik...">
+  <button onclick="sendChat()">Kirim</button>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, onValue, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+/* ================= FIREBASE CONFIG ================= */
+
+const firebaseConfig = {
+  apiKey: "ISI_API_KEY_KAMU",
+  authDomain: "ISI_AUTH_DOMAIN",
+  databaseURL: "ISI_DATABASE_URL",
+  projectId: "ISI_PROJECT_ID",
+  storageBucket: "ISI_STORAGE_BUCKET",
+  messagingSenderId: "ISI_SENDER_ID",
+  appId: "ISI_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+/* ================= GLOBAL ================= */
+
+let playerName="";
+let roomId="";
+let playerId="";
+
+/* ================= LOGIN ================= */
+
+window.login = async function(){
+  const name = document.getElementById("nameInput").value.trim();
+  if(!name) return alert("Masukkan nama!");
+
+  await signInAnonymously(auth);
+
+  playerName=name;
+  localStorage.setItem("unoName",name);
+
+  document.getElementById("loginScreen").style.display="none";
+  document.getElementById("game").style.display="block";
+};
+
+/* ================= ROOM ================= */
+
+window.createRoom=function(){
+  roomId="ROOM"+Math.floor(Math.random()*9999);
+  joinRoom();
+}
+
+window.joinRoom=function(){
+  roomId=document.getElementById("roomInput").value||roomId;
+  playerId="P"+Math.floor(Math.random()*9999);
+
+  set(ref(db,"rooms/"+roomId+"/players/"+playerId),{
+    name:playerName,
+    hand:[randomCard(),randomCard(),randomCard(),randomCard(),randomCard()]
+  });
+
+  set(ref(db,"rooms/"+roomId+"/discard"),randomCard());
+
+  listenRoom();
+}
+
+function listenRoom(){
+  onValue(ref(db,"rooms/"+roomId),(snap)=>{
+    let data=snap.val();
+    if(!data) return;
+
+    renderDiscard(data.discard);
+    let me=data.players[playerId];
+    if(me) renderHand(me.hand);
+  });
+
+  onValue(ref(db,"rooms/"+roomId+"/chat"),(snap)=>{
+    let data=snap.val();
+    if(!data) return;
+
+    let html="";
+    Object.values(data).forEach(c=>{
+      html+="<b>"+c.name+":</b> "+c.text+"<br>";
+    });
+
+    document.getElementById("chatBox").innerHTML=html;
+  });
+}
+
+/* ================= CARD ================= */
+
+const colors=["red","blue","green","yellow"];
+const values=["1","2","3","4","5","6","7","8","9","+2","R","S"];
+
+function randomCard(){
+  return{
+    color:colors[Math.floor(Math.random()*4)],
+    value:values[Math.floor(Math.random()*values.length)]
+  };
+}
+
+function renderHand(hand){
+  let html="";
+  hand.forEach((c,i)=>{
+    html+=`<div class="card ${c.color}" onclick="playCard(${i})">${c.value}</div>`;
+  });
+  document.getElementById("hand").innerHTML=html;
+}
+
+function renderDiscard(card){
+  document.getElementById("discard").innerHTML=
+  `<div class="card ${card.color}">${card.value}</div>`;
+}
+
+window.playCard=function(index){
+  onValue(ref(db,"rooms/"+roomId),(snap)=>{
+    let data=snap.val();
+    let me=data.players[playerId];
+    let card=me.hand[index];
+    let top=data.discard;
+
+    if(card.color!==top.color && card.value!==top.value) return;
+
+    me.hand.splice(index,1);
+    data.discard=card;
+
+    set(ref(db,"rooms/"+roomId),data);
+  },{onlyOnce:true});
+}
+
+/* ================= CHAT ================= */
+
+window.sendChat=function(){
+  let msg=document.getElementById("chatInput").value;
+  if(!msg) return;
+
+  push(ref(db,"rooms/"+roomId+"/chat"),{
+    name:playerName,
+    text:msg
+  });
+
+  document.getElementById("chatInput").value="";
+};
+
+</script>
+
+</body>
+</html>
