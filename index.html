@@ -2,223 +2,223 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>UNO Online </title>
-
+<title>UNO Online</title>
 <style>
 body{
-  margin:0;
-  background: radial-gradient(circle at center, #1a1a1a 0%, #0d0d0d 70%);
-  font-family: Arial Black;
+  font-family:Arial;
+  background:#0b6623;
   color:white;
   text-align:center;
 }
-
-#loginScreen{ margin-top:100px; }
-
-input,button{
-  padding:10px;
-  border-radius:10px;
-  border:none;
-  margin:5px;
-}
-
 button{
-  background:#FFD700;
-  font-weight:bold;
-  cursor:pointer;
-}
-
-#game{ display:none; }
-
-.card{
-  width:70px;
-  height:100px;
-  border-radius:14px;
-  display:inline-flex;
-  justify-content:center;
-  align-items:center;
-  font-size:22px;
+  padding:8px 15px;
   margin:5px;
+  border:none;
+  border-radius:8px;
   cursor:pointer;
 }
-
-.red{ background:#FF0000; }
-.blue{ background:#0066FF; }
-.green{ background:#00AA00; }
-.yellow{ background:#FFD700; color:black; }
+.card{
+  display:inline-block;
+  width:60px;
+  height:90px;
+  border-radius:10px;
+  margin:5px;
+  line-height:90px;
+  font-weight:bold;
+  color:white;
+}
+.red{background:#e53935;}
+.blue{background:#1e88e5;}
+.green{background:#43a047;}
+.yellow{background:#fdd835;color:black;}
 </style>
 </head>
-
 <body>
 
+<!-- LOGIN -->
 <div id="loginScreen">
-  <h1>UNO ONLINE </h1>
+  <h2>UNO Game</h2>
   <input id="nameInput" placeholder="Masukkan Nama">
-  <button onclick="login()">Login</button>
+  <br><br>
+  <button onclick="startOnline()">Online Multiplayer</button>
+  <button onclick="startBot()">Lawan Bot</button>
 </div>
 
-<div id="game">
-  <h2 id="playerInfo"></h2>
-
-  <button onclick="createRoom()">Buat Room</button>
-  <input id="roomInput" placeholder="Room ID">
-  <button onclick="joinRoom()">Join Room</button>
-
+<!-- GAME -->
+<div id="game" style="display:none;">
+  <h2>UNO 4 Player</h2>
+  <div id="turnInfo"></div>
+  <div id="players"></div>
   <h3>Discard:</h3>
   <div id="discard"></div>
-
   <h3>Kartu Kamu:</h3>
-  <div id="hand"></div>
-
-  <h3>Chat</h3>
-  <div id="chatBox"></div>
-  <input id="chatInput" placeholder="Ketik...">
-  <button onclick="sendChat()">Kirim</button>
+  <div id="myHand"></div>
+  <button onclick="drawCard()">Ambil Kartu</button>
 </div>
 
-<script type="module">
+<script>
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, onValue, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+let mode="bot";
+let players={};
+let turnIndex=0;
+let direction=1;
+let discard={};
+let currentColor="";
+let myId="player1";
+let myTurn=false;
 
-/* ================= FIREBASE CONFIG ================= */
+function startBot(){
+  const name=document.getElementById("nameInput").value;
+  if(!name)return alert("Isi nama!");
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBvd1DHwW8ObHX2RpQHVAC5ToiKWH-z0Cg",
-  authDomain: "uno-online-9ff2f.firebaseapp.com",
-  projectId: "uno-online-9ff2f",
-  storageBucket: "uno-online-9ff2f.firebasestorage.app",
-  messagingSenderId: "285267848462",
-  appId: "1:285267848462:web:da24cfb8d4ff04441b7b5f",
-  databaseURL: "https://uno-online-9ff2f-default-rtdb.asia-southeast1.firebasedatabase.app"
-};
+  mode="bot";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+  players={
+    player1:{name:name,hand:generateHand(),bot:false},
+    bot2:{name:"Bot A",hand:generateHand(),bot:true},
+    bot3:{name:"Bot B",hand:generateHand(),bot:true},
+    bot4:{name:"Bot C",hand:generateHand(),bot:true}
+  };
 
-/* ================= GLOBAL ================= */
-
-let playerName="";
-let roomId="";
-let playerId="";
-
-/* ================= LOGIN ================= */
-
-window.login = async function(){
-  const name = document.getElementById("nameInput").value.trim();
-  if(!name) return alert("Masukkan nama!");
-
-  await signInAnonymously(auth);
-
-  playerName=name;
-  localStorage.setItem("unoName",name);
+  discard=randomCard();
+  currentColor=discard.color;
 
   document.getElementById("loginScreen").style.display="none";
   document.getElementById("game").style.display="block";
-};
 
-/* ================= ROOM ================= */
-
-window.createRoom=function(){
-  roomId="ROOM"+Math.floor(Math.random()*9999);
-  joinRoom();
+  renderAll();
+  checkBotTurn();
 }
 
-window.joinRoom=function(){
-  roomId=document.getElementById("roomInput").value||roomId;
-  playerId="P"+Math.floor(Math.random()*9999);
-
-  set(ref(db,"rooms/"+roomId+"/players/"+playerId),{
-    name:playerName,
-    hand:[randomCard(),randomCard(),randomCard(),randomCard(),randomCard()]
-  });
-
-  set(ref(db,"rooms/"+roomId+"/discard"),randomCard());
-
-  listenRoom();
+function generateHand(){
+  let hand=[];
+  for(let i=0;i<7;i++){
+    hand.push(randomCard());
+  }
+  return hand;
 }
-
-function listenRoom(){
-  onValue(ref(db,"rooms/"+roomId),(snap)=>{
-    let data=snap.val();
-    if(!data) return;
-
-    renderDiscard(data.discard);
-    let me=data.players[playerId];
-    if(me) renderHand(me.hand);
-  });
-
-  onValue(ref(db,"rooms/"+roomId+"/chat"),(snap)=>{
-    let data=snap.val();
-    if(!data) return;
-
-    let html="";
-    Object.values(data).forEach(c=>{
-      html+="<b>"+c.name+":</b> "+c.text+"<br>";
-    });
-
-    document.getElementById("chatBox").innerHTML=html;
-  });
-}
-
-/* ================= CARD ================= */
-
-const colors=["red","blue","green","yellow"];
-const values=["1","2","3","4","5","6","7","8","9","+2","R","S"];
 
 function randomCard(){
-  return{
+  const colors=["red","blue","green","yellow"];
+  const values=["0","1","2","3","4","5","6","7","8","9","+2","R","S"];
+  return {
     color:colors[Math.floor(Math.random()*4)],
     value:values[Math.floor(Math.random()*values.length)]
   };
 }
 
-function renderHand(hand){
-  let html="";
-  hand.forEach((c,i)=>{
-    html+=`<div class="card ${c.color}" onclick="playCard(${i})">${c.value}</div>`;
+function renderAll(){
+  renderPlayers();
+  renderDiscard();
+  renderHand();
+}
+
+function renderPlayers(){
+  const div=document.getElementById("players");
+  div.innerHTML="";
+  const ids=Object.keys(players);
+
+  ids.forEach((id,i)=>{
+    div.innerHTML+=`
+      <div>
+        ${players[id].name} (${players[id].hand.length})
+        ${i===turnIndex?" ← Turn":""}
+      </div>
+    `;
   });
-  document.getElementById("hand").innerHTML=html;
 }
 
-function renderDiscard(card){
-  document.getElementById("discard").innerHTML=
-  `<div class="card ${card.color}">${card.value}</div>`;
+function renderDiscard(){
+  const div=document.getElementById("discard");
+  div.className="card "+discard.color;
+  div.innerText=discard.value;
 }
 
-window.playCard=function(index){
-  onValue(ref(db,"rooms/"+roomId),(snap)=>{
-    let data=snap.val();
-    let me=data.players[playerId];
-    let card=me.hand[index];
-    let top=data.discard;
-
-    if(card.color!==top.color && card.value!==top.value) return;
-
-    me.hand.splice(index,1);
-    data.discard=card;
-
-    set(ref(db,"rooms/"+roomId),data);
-  },{onlyOnce:true});
-}
-
-/* ================= CHAT ================= */
-
-window.sendChat=function(){
-  let msg=document.getElementById("chatInput").value;
-  if(!msg) return;
-
-  push(ref(db,"rooms/"+roomId+"/chat"),{
-    name:playerName,
-    text:msg
+function renderHand(){
+  const div=document.getElementById("myHand");
+  div.innerHTML="";
+  players[myId].hand.forEach((card,index)=>{
+    div.innerHTML+=`
+      <div class="card ${card.color}" onclick="playCard(${index})">
+        ${card.value}
+      </div>
+    `;
   });
+}
 
-  document.getElementById("chatInput").value="";
-};
+function playCard(index){
+  const ids=Object.keys(players);
+  if(ids[turnIndex]!==myId)return;
+
+  let myHand=players[myId].hand;
+  const card=myHand[index];
+
+  if(card.color!==currentColor &&
+     card.value!==discard.value){
+    return alert("Kartu tidak cocok!");
+  }
+
+  myHand.splice(index,1);
+  discard=card;
+  currentColor=card.color;
+
+  nextTurn();
+  renderAll();
+  checkBotTurn();
+}
+
+function drawCard(){
+  const ids=Object.keys(players);
+  if(ids[turnIndex]!==myId)return;
+
+  players[myId].hand.push(randomCard());
+  nextTurn();
+  renderAll();
+  checkBotTurn();
+}
+
+function nextTurn(){
+  const total=Object.keys(players).length;
+  turnIndex+=direction;
+  if(turnIndex>=total)turnIndex=0;
+  if(turnIndex<0)turnIndex=total-1;
+}
+
+function checkBotTurn(){
+  const ids=Object.keys(players);
+  const current=ids[turnIndex];
+
+  if(players[current].bot){
+    setTimeout(()=>{
+      botPlay(current);
+    },1000);
+  }
+}
+
+function botPlay(id){
+  let hand=players[id].hand;
+  let played=false;
+
+  for(let i=0;i<hand.length;i++){
+    if(hand[i].color===currentColor ||
+       hand[i].value===discard.value){
+      discard=hand[i];
+      currentColor=hand[i].color;
+      hand.splice(i,1);
+      played=true;
+      break;
+    }
+  }
+
+  if(!played){
+    hand.push(randomCard());
+  }
+
+  nextTurn();
+  renderAll();
+  checkBotTurn();
+}
 
 </script>
-
 </body>
 </html>
