@@ -2,223 +2,459 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>UNO Online</title>
+<title>UNO ULTIMATE</title>
 <style>
 body{
+  margin:0;
+  background:#111;
   font-family:Arial;
-  background:#0b6623;
+  overflow:hidden;
+}
+.table{
+  position:relative;
+  width:100vw;
+  height:100vh;
+  background:radial-gradient(circle,#0b6623 40%,#063d17 100%);
+}
+.player{
+  position:absolute;
   color:white;
   text-align:center;
+  transition:0.3s;
 }
-button{
-  padding:8px 15px;
-  margin:5px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
+.turn{
+  animation:glow 1s infinite alternate;
+}
+@keyframes glow{
+  from{box-shadow:0 0 5px gold;}
+  to{box-shadow:0 0 20px gold;}
 }
 .card{
-  display:inline-block;
-  width:60px;
-  height:90px;
-  border-radius:10px;
-  margin:5px;
-  line-height:90px;
+  width:75px;
+  height:110px;
+  border-radius:14px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin:4px;
+  font-size:22px;
   font-weight:bold;
   color:white;
+  cursor:pointer;
+  box-shadow:0 5px 15px rgba(0,0,0,0.6);
+  transition:0.3s;
 }
+.card:hover{ transform:translateY(-15px) scale(1.05); }
 .red{background:#e53935;}
 .blue{background:#1e88e5;}
 .green{background:#43a047;}
 .yellow{background:#fdd835;color:black;}
+.black{background:black;}
+.back{background:linear-gradient(45deg,#222,#555);}
+.top{top:20px;left:50%;transform:translateX(-50%);}
+.bottom{bottom:20px;left:50%;transform:translateX(-50%);}
+.left{left:20px;top:50%;transform:translateY(-50%);}
+.right{right:20px;top:50%;transform:translateY(-50%);}
+.center{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+}
+.discard{
+  width:100px;
+  height:150px;
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:40px;
+  font-weight:bold;
+  color:white;
+  box-shadow:0 10px 20px rgba(0,0,0,0.6);
+}
+.modeSelect{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  background:#222;
+  padding:30px;
+  border-radius:15px;
+  text-align:center;
+  color:white;
+}
+button{
+  padding:8px 15px;
+  border:none;
+  border-radius:8px;
+  margin:5px;
+  cursor:pointer;
+}
+.timer{
+  position:absolute;
+  top:20px;
+  right:20px;
+  color:white;
+  font-size:20px;
+}
+.arrow{
+  position:absolute;
+  top:20px;
+  left:20px;
+  font-size:30px;
+  color:white;
+}
+.goldCard{
+  background:linear-gradient(45deg,gold,orange);
+  color:black;
+}
 </style>
 </head>
 <body>
-
-<!-- LOGIN -->
-<div id="loginScreen">
-  <h2>UNO Game</h2>
-  <input id="nameInput" placeholder="Masukkan Nama">
-  <br><br>
-  <button onclick="startOnline()">Online Multiplayer</button>
-  <button onclick="startBot()">Lawan Bot</button>
+  
+<div class="modeSelect" id="menu">
+  <h2>UNO ULTIMATE</h2>
+  <button onclick="startGame('classic')">Offline Classic</button>
+  <button onclick="startGame('flip')">Offline Flip</button>
+  <button onclick="startOnline('classic')">Online Classic</button>
+  <button onclick="startOnline('flip')">Online Flip</button>
 </div>
 
-<!-- GAME -->
-<div id="game" style="display:none;">
-  <h2>UNO 4 Player</h2>
-  <div id="turnInfo"></div>
-  <div id="players"></div>
-  <h3>Discard:</h3>
-  <div id="discard"></div>
-  <h3>Kartu Kamu:</h3>
-  <div id="myHand"></div>
-  <button onclick="drawCard()">Ambil Kartu</button>
+<div class="table" id="game" style="display:none;">
+  <div class="arrow" id="arrow">↻</div>
+  <div class="timer" id="timer"></div>
+
+  <div id="bot2" class="player top"></div>
+  <div id="bot3" class="player left"></div>
+  <div id="bot4" class="player right"></div>
+  <div id="player1" class="player bottom"></div>
+
+  <div class="center">
+    <div id="discard" class="discard"></div>
+  </div>
 </div>
 
-<script>
+<div id="chatBox" style="position:absolute;bottom:0;right:0;width:250px;background:#222;color:white;padding:10px;">
+  <div id="messages" style="height:120px;overflow:auto;"></div>
+  <input id="chatInput" placeholder="Ketik..." style="width:70%">
+  <button onclick="sendChat()">Kirim</button>
+</div>
 
-let mode="bot";
-let players={};
-let turnIndex=0;
-let direction=1;
-let discard={};
-let currentColor="";
-let myId="player1";
-let myTurn=false;
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, update, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-function startBot(){
-  const name=document.getElementById("nameInput").value;
-  if(!name)return alert("Isi nama!");
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, update, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-  mode="bot";
+const firebaseConfig = {
+  apiKey: "ISI_CONFIG_KAMU",
+  authDomain: "ISI",
+  databaseURL: "ISI",
+  projectId: "ISI",
+  storageBucket: "ISI",
+  messagingSenderId: "ISI",
+  appId: "ISI"
+};
 
-  players={
-    player1:{name:name,hand:generateHand(),bot:false},
-    bot2:{name:"Bot A",hand:generateHand(),bot:true},
-    bot3:{name:"Bot B",hand:generateHand(),bot:true},
-    bot4:{name:"Bot C",hand:generateHand(),bot:true}
-  };
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-  discard=randomCard();
-  currentColor=discard.color;
+window.db = db;
+window.fb = { ref, set, update, push, onValue, get };
+</script>
 
-  document.getElementById("loginScreen").style.display="none";
-  document.getElementById("game").style.display="block";
+let online=false
+let roomId=""
+let myIdOnline=""
 
-  renderAll();
-  checkBotTurn();
+async function startOnline(selected){
+  mode=selected
+  online=true
+
+  const name=prompt("Masukkan Nama")
+  if(!name)return
+  const today=new Date().toDateString()
+  const last=localStorage.getItem("daily")
+
+  if(last!==today){
+  alert("Daily Reward +30 XP")
+  localStorage.setItem("daily",today)
+  }
+
+  myIdOnline="id_"+Math.random().toString(36).substr(2,9)
+
+  await findRoom(name)
+  await update(fb.ref(db,"leaderboard/"+myIdOnline),{
+  name:playersData[myIdOnline].name,
+  xp:(playersData[myIdOnline].xp||0)+50
+  })
+
+  document.getElementById("menu").style.display="none"
+  document.getElementById("game").style.display="block"
+
+  listenRoom()
 }
 
-function generateHand(){
-  let hand=[];
-  for(let i=0;i<7;i++){
-    hand.push(randomCard());
+
+let mode="classic"
+let players={}
+let turnIndex=0
+let direction=1
+let discard={}
+let currentColor=""
+let myId="player1"
+let timer=10
+let interval
+let flipState="light"
+let skinClass = player.skin==="gold" ? "goldCard" : c.color
+
+
+function listenRoom(){
+  const {ref,onValue,update} = fb
+
+  onValue(ref(db,"rooms/"+roomId),(snap)=>{
+    const data=snap.val()
+    if(!data)return
+
+    if(Object.keys(data.players).length===4){
+      update(ref(db,"rooms/"+roomId),{started:true})
+    }
+
+    renderOnline(data)
+  })
+}
+
+function renderOnline(data){
+  const playersData=data.players
+  const ids=Object.keys(playersData)
+
+  turnIndex=data.turnIndex
+  direction=data.direction
+  discard=data.discard
+  currentColor=data.currentColor
+
+  renderDiscard()
+  renderPlayersOnline(playersData)
+
+  if(ids[data.turnIndex]===myIdOnline){
+    document.getElementById("timer").innerText="Giliran Kamu"
+  }else{
+    document.getElementById("timer").innerText="Menunggu..."
   }
-  return hand;
+}
+
+function sendChat(){
+  const text=document.getElementById("chatInput").value
+  if(!text)return
+
+  const {ref,push} = fb
+  push(ref(db,"rooms/"+roomId+"/chat"),{
+    name:myIdOnline,
+    text:text
+  })
+
+  document.getElementById("chatInput").value=""
+}
+
+fb.onValue(fb.ref(db,"rooms/"+roomId+"/chat"),(snap)=>{
+  const box=document.getElementById("messages")
+  box.innerHTML=""
+  snap.forEach(msg=>{
+    box.innerHTML+=`<div>${msg.val().name}: ${msg.val().text}</div>`
+  })
+})
+
+function startGame(selected){
+  mode=selected
+  document.getElementById("menu").style.display="none"
+  document.getElementById("game").style.display="block"
+
+  players={
+    player1:{name:"Kamu",hand:genHand(),bot:false,uno:false},
+    bot2:{name:"Bot A",hand:genHand(),bot:true,uno:false},
+    bot3:{name:"Bot B",hand:genHand(),bot:true,uno:false},
+    bot4:{name:"Bot C",hand:genHand(),bot:true,uno:false}
+  }
+
+  discard=randomCard()
+  currentColor=discard.color
+
+  renderAll()
+  startTimer()
+  checkBot()
+}
+
+function genHand(){
+  let h=[]
+  for(let i=0;i<7;i++)h.push(randomCard())
+  return h
 }
 
 function randomCard(){
-  const colors=["red","blue","green","yellow"];
-  const values=["0","1","2","3","4","5","6","7","8","9","+2","R","S"];
-  return {
-    color:colors[Math.floor(Math.random()*4)],
-    value:values[Math.floor(Math.random()*values.length)]
-  };
+  const colors=["red","blue","green","yellow"]
+  const values=["0","1","2","3","4","5","6","7","8","9","+2","+4","R","S","W"]
+  return {color:colors[Math.floor(Math.random()*4)],
+          value:values[Math.floor(Math.random()*values.length)]}
 }
 
-function renderAll(){
-  renderPlayers();
-  renderDiscard();
-  renderHand();
+function startTimer(){
+  timer=10
+  clearInterval(interval)
+  interval=setInterval(()=>{
+    timer--
+    document.getElementById("timer").innerText="Timer: "+timer
+    if(timer<=0){
+      clearInterval(interval)
+      autoDraw()
+    }
+  },1000)
 }
 
-function renderPlayers(){
-  const div=document.getElementById("players");
-  div.innerHTML="";
-  const ids=Object.keys(players);
-
-  ids.forEach((id,i)=>{
-    div.innerHTML+=`
-      <div>
-        ${players[id].name} (${players[id].hand.length})
-        ${i===turnIndex?" ← Turn":""}
-      </div>
-    `;
-  });
-}
-
-function renderDiscard(){
-  const div=document.getElementById("discard");
-  div.className="card "+discard.color;
-  div.innerText=discard.value;
-}
-
-function renderHand(){
-  const div=document.getElementById("myHand");
-  div.innerHTML="";
-  players[myId].hand.forEach((card,index)=>{
-    div.innerHTML+=`
-      <div class="card ${card.color}" onclick="playCard(${index})">
-        ${card.value}
-      </div>
-    `;
-  });
+function autoDraw(){
+  const ids=Object.keys(players)
+  const current=ids[turnIndex]
+  players[current].hand.push(randomCard())
+  nextTurn()
+  renderAll()
+  startTimer()
+  checkBot()
 }
 
 function playCard(index){
-  const ids=Object.keys(players);
-  if(ids[turnIndex]!==myId)return;
+  const ids=Object.keys(players)
+  if(ids[turnIndex]!==myId)return
 
-  let myHand=players[myId].hand;
-  const card=myHand[index];
+  let hand=players[myId].hand
+  let card=hand[index]
 
-  if(card.color!==currentColor &&
-     card.value!==discard.value){
-    return alert("Kartu tidak cocok!");
+  if(card.value==="W"||card.value==="+4"){
+    let c=prompt("Pilih warna: red/blue/green/yellow")
+    if(!c)return
+    currentColor=c
+  }else{
+    if(card.color!==currentColor && card.value!==discard.value) return
+    currentColor=card.color
   }
 
-  myHand.splice(index,1);
-  discard=card;
-  currentColor=card.color;
+  hand.splice(index,1)
+  applyEffect(card)
 
-  nextTurn();
-  renderAll();
-  checkBotTurn();
+  discard=card
+
+  if(hand.length===1&&!players[myId].uno){
+    hand.push(randomCard())
+    hand.push(randomCard())
+  }
+
+  if(hand.length===0){
+    alert("Kamu Menang!")
+    startGame(mode)
+    return
+  }
+
+  nextTurn()
+  renderAll()
+  startTimer()
+  checkBot()
 }
 
-function drawCard(){
-  const ids=Object.keys(players);
-  if(ids[turnIndex]!==myId)return;
+function applyEffect(card){
+  if(card.value==="R") direction*=-1
+  if(card.value==="S") nextTurn()
+  if(card.value==="+2") giveCards(2)
+  if(card.value==="+4") giveCards(4)
+}
 
-  players[myId].hand.push(randomCard());
-  nextTurn();
-  renderAll();
-  checkBotTurn();
+function giveCards(n){
+  const ids=Object.keys(players)
+  const next=ids[(turnIndex+direction+ids.length)%ids.length]
+  for(let i=0;i<n;i++) players[next].hand.push(randomCard())
 }
 
 function nextTurn(){
-  const total=Object.keys(players).length;
-  turnIndex+=direction;
-  if(turnIndex>=total)turnIndex=0;
-  if(turnIndex<0)turnIndex=total-1;
+  const total=Object.keys(players).length
+  turnIndex+=direction
+  if(turnIndex>=total)turnIndex=0
+  if(turnIndex<0)turnIndex=total-1
+  document.getElementById("arrow").innerText=direction===1?"↻":"↺"
 }
 
-function checkBotTurn(){
-  const ids=Object.keys(players);
-  const current=ids[turnIndex];
-
+function checkBot(){
+  const ids=Object.keys(players)
+  const current=ids[turnIndex]
   if(players[current].bot){
-    setTimeout(()=>{
-      botPlay(current);
-    },1000);
+    setTimeout(()=>botPlay(current),1000)
   }
 }
 
 function botPlay(id){
-  let hand=players[id].hand;
-  let played=false;
+  let hand=players[id].hand
+  let played=false
 
   for(let i=0;i<hand.length;i++){
-    if(hand[i].color===currentColor ||
-       hand[i].value===discard.value){
-      discard=hand[i];
-      currentColor=hand[i].color;
-      hand.splice(i,1);
-      played=true;
-      break;
+    if(hand[i].color===currentColor||hand[i].value===discard.value||hand[i].value==="W"||hand[i].value==="+4"){
+      discard=hand[i]
+      currentColor=hand[i].color
+      applyEffect(hand[i])
+      hand.splice(i,1)
+      played=true
+      break
     }
   }
 
-  if(!played){
-    hand.push(randomCard());
+  if(!played) hand.push(randomCard())
+
+  if(hand.length===0){
+    alert(players[id].name+" Menang!")
+    startGame(mode)
+    return
   }
 
-  nextTurn();
-  renderAll();
-  checkBotTurn();
+  nextTurn()
+  renderAll()
+  startTimer()
+  checkBot()
+}
+
+function renderAll(){
+  renderDiscard()
+  renderPlayers()
+}
+
+function renderDiscard(){
+  const d=document.getElementById("discard")
+  d.className="discard "+(discard.color||"black")
+  d.innerText=discard.value
+}
+
+function renderPlayers(){
+  const ids=Object.keys(players)
+  ids.forEach((id,i)=>{
+    const div=document.getElementById(id)
+    div.className="player "+getPos(id)
+    if(i===turnIndex)div.classList.add("turn")
+    div.innerHTML=`<div>${players[id].name} (${players[id].hand.length})</div>`
+
+    if(!players[id].bot){
+      players[id].hand.forEach((c,ind)=>{
+        div.innerHTML+=`<div class="card ${c.color}" onclick="playCard(${ind})">${c.value}</div>`
+      })
+    }else{
+      div.innerHTML+=`${'<div class="card back"></div>'.repeat(players[id].hand.length)}`
+    }
+  })
+}
+
+function getPos(id){
+  if(id==="player1")return"bottom"
+  if(id==="bot2")return"top"
+  if(id==="bot3")return"left"
+  if(id==="bot4")return"right"
 }
 
 </script>
 </body>
-</html>
+    </html>
