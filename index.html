@@ -2,515 +2,322 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>UNO ULTIMATE</title>
+<title>UNO Online</title>
 <style>
 body{
   margin:0;
-  background:#111;
   font-family:Arial;
-  overflow:hidden;
-}
-.table{
-  position:relative;
-  width:100vw;
-  height:100vh;
-  background:radial-gradient(circle,#0b6623 40%,#063d17 100%);
-}
-.player{
-  position:absolute;
+  background:#0f172a;
   color:white;
   text-align:center;
-  transition:0.3s;
 }
-.turn{
-  animation:glow 1s infinite alternate;
+.container{
+  max-width:900px;
+  margin:auto;
+  padding:20px;
 }
-@keyframes glow{
-  from{box-shadow:0 0 5px gold;}
-  to{box-shadow:0 0 20px gold;}
-}
-.card{
-  width:75px;
-  height:110px;
-  border-radius:14px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  margin:4px;
-  font-size:22px;
-  font-weight:bold;
+button{
+  padding:10px 15px;
+  margin:5px;
+  border:none;
+  border-radius:8px;
+  background:#2563eb;
   color:white;
   cursor:pointer;
-  box-shadow:0 5px 15px rgba(0,0,0,0.6);
-  transition:0.3s;
 }
-.card:hover{ transform:translateY(-15px) scale(1.05); }
+button:hover{ background:#1d4ed8; }
+input{
+  padding:10px;
+  border-radius:8px;
+  border:none;
+}
+.card{
+  display:inline-block;
+  padding:12px;
+  margin:4px;
+  border-radius:10px;
+  font-weight:bold;
+  cursor:pointer;
+}
 .red{background:#e53935;}
 .blue{background:#1e88e5;}
 .green{background:#43a047;}
 .yellow{background:#fdd835;color:black;}
-.black{background:black;}
-.back{background:linear-gradient(45deg,#222,#555);}
-.top{top:20px;left:50%;transform:translateX(-50%);}
-.bottom{bottom:20px;left:50%;transform:translateX(-50%);}
-.left{left:20px;top:50%;transform:translateY(-50%);}
-.right{right:20px;top:50%;transform:translateY(-50%);}
-.center{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-}
-.discard{
-  width:100px;
-  height:150px;
-  border-radius:16px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:40px;
-  font-weight:bold;
-  color:white;
-  box-shadow:0 10px 20px rgba(0,0,0,0.6);
-}
-.modeSelect{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  background:#222;
-  padding:30px;
-  border-radius:15px;
-  text-align:center;
-  color:white;
-}
-button{
-  padding:8px 15px;
-  border:none;
-  border-radius:8px;
-  margin:5px;
-  cursor:pointer;
-}
-.timer{
-  position:absolute;
-  top:20px;
-  right:20px;
-  color:white;
-  font-size:20px;
-}
-.arrow{
-  position:absolute;
-  top:20px;
-  left:20px;
-  font-size:30px;
-  color:white;
-}
-.goldCard{
-  background:linear-gradient(45deg,gold,orange);
-  color:black;
-}
+#game{display:none;}
+#room{display:none;}
+#lobby{display:none;}
 </style>
 </head>
 <body>
-  
-<div class="modeSelect" id="menu">
-  <h2>UNO ULTIMATE PRO</h2>
 
-  <input id="nameInput" placeholder="Masukkan Nama..." 
-  style="padding:10px;border-radius:8px;border:none;margin-bottom:10px;width:200px;">
+<div class="container">
 
+<div id="login">
+  <h2>UNO Online</h2>
+  <input id="nameInput" placeholder="Nama kamu">
+  <br><br>
+  <button onclick="login()">Masuk</button>
+</div>
+
+<div id="lobby">
+  <h3>Lobby</h3>
+  <button onclick="createRoom()">Create Room</button>
   <br>
-
-  <button onclick="startGameWithLogin('classic')">Offline Classic</button>
-  <button onclick="startGameWithLogin('flip')">Offline Flip</button>
+  <input id="roomInput" placeholder="Kode Room">
+  <button onclick="joinRoomFromInput()">Join Room</button>
+  <br><br>
+  <h4>Quick Match</h4>
+  <button onclick="quickCasual()">Quick Casual</button>
+  <button onclick="quickRanked1v1()">Quick Ranked 1v1</button>
+  <div id="rankInfo"></div>
 </div>
 
-
-<div class="table" id="game" style="display:none;">
-  <div class="arrow" id="arrow">↻</div>
-  <div class="timer" id="timer"></div>
-
-  <div id="bot2" class="player top"></div>
-  <div id="bot3" class="player left"></div>
-  <div id="bot4" class="player right"></div>
-  <div id="player1" class="player bottom"></div>
-
-  <div class="center">
-    <div id="discard" class="discard"></div>
-  </div>
+<div id="room">
+  <h3 id="roomTitle"></h3>
+  <div id="players"></div>
+  <button id="startBtn" onclick="startGame()">Start Game</button>
 </div>
 
-<div id="chatBox" style="position:absolute;bottom:0;right:0;width:250px;background:#222;color:white;padding:10px;">
-  <div id="messages" style="height:120px;overflow:auto;"></div>
-  <input id="chatInput" placeholder="Ketik..." style="width:70%">
-  <button onclick="sendChat()">Kirim</button>
+<div id="game">
+  <h3 id="modeTitle"></h3>
+  <div id="discard"></div>
+  <div id="hand"></div>
+</div>
+
+<div id="leaderboard"></div>
+
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, update, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, update, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, update, push, onValue, get, remove }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 const firebaseConfig = {
   apiKey: "AIzaSyBvd1DHwW8ObHX2RpQHVAC5ToiKWH-z0Cg",
   authDomain: "uno-online-9ff2f.firebaseapp.com",
   projectId: "uno-online-9ff2f",
   storageBucket: "uno-online-9ff2f.firebasestorage.app",
   messagingSenderId: "285267848462",
-  appId: "1:285267848462:web:da24cfb8d4ff04441b7b5f",
+  appId: "1:285267848462:web:da24cfb8d4ff04441b7b5f"
 };
 
-// Firebase hanya aktif kalau config sudah kamu isi
-let db = null;
-let fb = null;
 
-if (firebaseConfig.apiKey !== "AIzaSyBvd1DHwW8ObHX2RpQHVAC5ToiKWH-z0Cg") {
-  const app = initializeApp(firebaseConfig);
-  db = getDatabase(app);
-  fb = { ref, set, update, push, onValue, get };
-  console.log("Firebase Connected");
-} else {
-  console.log("Firebase belum diisi");
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let profile = {
+  id:"p_"+Math.random().toString(36).substring(2,9),
+  name:"",
+  ranks:{ "1v1":1000 }
+};
+
+let roomId="";
+let isHost=false;
+
+window.login = function(){
+  const name=document.getElementById("nameInput").value.trim();
+  if(!name) return alert("Masukkan nama");
+  profile.name=name;
+  document.getElementById("login").style.display="none";
+  document.getElementById("lobby").style.display="block";
+  loadRank();
+};
+
+function loadRank(){
+  onValue(ref(db,"players/"+profile.id),(snap)=>{
+    if(snap.exists()){
+      profile.ranks = snap.val().ranks || profile.ranks;
+    }
+    document.getElementById("rankInfo").innerHTML=
+      "Rank 1v1: "+profile.ranks["1v1"];
+  });
 }
 
-window.db = db;
-window.fb = fb;
-</script>
-
-let online=false
-let roomId=""
-let myIdOnline=""
-
-async function startOnline(selected){
-
-  if (!window.fb || !window.db) {
-    alert("Mode Online belum aktif. Isi Firebase config dulu.");
-    return;
-  }
-
-  mode=selected
-  online=true
-
-  const name=prompt("Masukkan Nama")
-  if(!name)return
-  const today=new Date().toDateString()
-  const last=localStorage.getItem("daily")
-
-  if(last!==today){
-  alert("Daily Reward +30 XP")
-  localStorage.setItem("daily",today)
-  }
-
-  myIdOnline="id_"+Math.random().toString(36).substr(2,9)
-
-  await findRoom(name)
-  await update(fb.ref(db,"leaderboard/"+myIdOnline),{
-  name:playersData[myIdOnline].name,
-  xp:(playersData[myIdOnline].xp||0)+50
-  })
-
-  document.getElementById("menu").style.display="none"
-  document.getElementById("game").style.display="block"
-
-  listenRoom()
+function generateRoomCode(){
+  return "UNO-"+Math.random().toString(36).substring(2,6).toUpperCase();
 }
 
+window.createRoom=async function(){
+  const code=generateRoomCode();
+  roomId=code;
+  isHost=true;
 
-let mode="classic"
-let players={}
-let turnIndex=0
-let direction=1
-let discard={}
-let currentColor=""
-let myId="player1"
-let timer=10
-let interval
-let flipState="light"
-let skinClass = player.skin==="gold" ? "goldCard" : c.color
+  await set(ref(db,"rooms/"+code),{
+    mode:"casual",
+    host:profile.id,
+    started:false,
+    turnIndex:0,
+    players:{}
+  });
 
-function startGameWithLogin(selected){
-  const nameInput = document.getElementById("nameInput");
-  let name = nameInput.value.trim();
+  joinRoom(code);
+};
 
-  if(!name){
-    alert("Masukkan nama dulu!");
-    return;
-  }
+window.joinRoomFromInput=function(){
+  const code=document.getElementById("roomInput").value.trim();
+  if(!code) return alert("Masukkan kode");
+  joinRoom(code);
+};
 
-  localStorage.setItem("unoPlayerName", name);
+async function joinRoom(code){
+  roomId=code;
 
-  startGame(selected);
+  await set(ref(db,"rooms/"+code+"/players/"+profile.id),{
+    name:profile.name,
+    hand:[]
+  });
+
+  document.getElementById("lobby").style.display="none";
+  document.getElementById("room").style.display="block";
+  document.getElementById("roomTitle").innerText="Room: "+code;
+
+  listenRoom();
 }
 
 function listenRoom(){
-  const {ref,onValue,update} = fb
-
   onValue(ref(db,"rooms/"+roomId),(snap)=>{
-    const data=snap.val()
-    if(!data)return
+    const data=snap.val();
+    if(!data) return;
 
-    if(Object.keys(data.players).length===4){
-      update(ref(db,"rooms/"+roomId),{started:true})
+    renderPlayers(data.players);
+
+    if(data.started){
+      document.getElementById("room").style.display="none";
+      document.getElementById("game").style.display="block";
+      document.getElementById("modeTitle").innerText=
+        data.mode==="ranked"?"Ranked 1v1":"Casual";
+      updateGame(data);
     }
 
-    renderOnline(data)
-  })
-}
-
-function renderOnline(data){
-  const playersData=data.players
-  const ids=Object.keys(playersData)
-
-  turnIndex=data.turnIndex
-  direction=data.direction
-  discard=data.discard
-  currentColor=data.currentColor
-
-  renderDiscard()
-  renderPlayersOnline(playersData)
-
-  if(ids[data.turnIndex]===myIdOnline){
-    document.getElementById("timer").innerText="Giliran Kamu"
-  }else{
-    document.getElementById("timer").innerText="Menunggu..."
-  }
-}
-
-function sendChat(){
-  const text=document.getElementById("chatInput").value
-  if(!text)return
-
-  const {ref,push} = fb
-  push(ref(db,"rooms/"+roomId+"/chat"),{
-    name:myIdOnline,
-    text:text
-  })
-
-  document.getElementById("chatInput").value=""
-}
-
-fb.onValue(fb.ref(db,"rooms/"+roomId+"/chat"),(snap)=>{
-  const box=document.getElementById("messages")
-  box.innerHTML=""
-  snap.forEach(msg=>{
-    box.innerHTML+=`<div>${msg.val().name}: ${msg.val().text}</div>`
-  })
-})
-
-function startGame(selected){
-  mode=selected
-  const menu = document.getElementById("menu");
-  const game = document.getElementById("game");
-
-  menu.style.opacity="0";
-  setTimeout(()=>{
-  menu.style.display="none";
-  game.style.display="block";
-  game.style.opacity="0";
-  setTimeout(()=>{
-    game.style.opacity="1";
-  },50);
-  },300);
-
-
-  players={
-    player1:{
-  name:localStorage.getItem("unoPlayerName") || "Kamu",
-  hand:genHand(),
-  bot:false,
-  uno:false
-},
-    bot2:{name:"Bot A",hand:genHand(),bot:true,uno:false},
-    bot3:{name:"Bot B",hand:genHand(),bot:true,uno:false},
-    bot4:{name:"Bot C",hand:genHand(),bot:true,uno:false}
-  }
-
-  discard=randomCard()
-  currentColor=discard.color
-
-  renderAll()
-  startTimer()
-  checkBot()
-}
-
-function genHand(){
-  let h=[]
-  for(let i=0;i<7;i++)h.push(randomCard())
-  return h
-}
-
-function randomCard(){
-  const colors=["red","blue","green","yellow"]
-  const values=["0","1","2","3","4","5","6","7","8","9","+2","+4","R","S","W"]
-  return {color:colors[Math.floor(Math.random()*4)],
-          value:values[Math.floor(Math.random()*values.length)]}
-}
-
-function startTimer(){
-  timer=10
-  clearInterval(interval)
-  interval=setInterval(()=>{
-    timer--
-    document.getElementById("timer").innerText="Timer: "+timer
-    if(timer<=0){
-      clearInterval(interval)
-      autoDraw()
+    if(data.host!==profile.id){
+      document.getElementById("startBtn").style.display="none";
     }
-  },1000)
+  });
 }
 
-function autoDraw(){
-  const ids=Object.keys(players)
-  const current=ids[turnIndex]
-  players[current].hand.push(randomCard())
-  nextTurn()
-  renderAll()
-  startTimer()
-  checkBot()
+window.startGame=async function(){
+  const snap=await get(ref(db,"rooms/"+roomId+"/players"));
+  const players=snap.val();
+  let deck=generateDeck();
+  let updated={};
+
+  Object.keys(players).forEach(id=>{
+    updated[id]={...players[id],hand:deck.splice(0,7)};
+  });
+
+  await update(ref(db,"rooms/"+roomId),{
+    started:true,
+    discard:deck.pop(),
+    players:updated
+  });
+};
+
+function updateGame(data){
+  const ids=Object.keys(data.players);
+  const me=data.players[profile.id];
+
+  document.getElementById("discard").innerHTML=
+    "<div class='card "+data.discard.color+"'>"+data.discard.value+"</div>";
+
+  const handDiv=document.getElementById("hand");
+  handDiv.innerHTML="";
+
+  me.hand.forEach((card,i)=>{
+    const div=document.createElement("div");
+    div.className="card "+card.color;
+    div.innerText=card.value;
+
+    if(ids[data.turnIndex]===profile.id){
+      div.onclick=()=>playCard(i);
+    }
+
+    handDiv.appendChild(div);
+  });
 }
 
-function playCard(index){
-  const ids=Object.keys(players)
-  if(ids[turnIndex]!==myId)return
+async function playCard(index){
+  const snap=await get(ref(db,"rooms/"+roomId));
+  const data=snap.val();
+  const ids=Object.keys(data.players);
+  if(ids[data.turnIndex]!==profile.id) return;
 
-  let hand=players[myId].hand
-  let card=hand[index]
+  let player=data.players[profile.id];
+  let card=player.hand[index];
+  player.hand.splice(index,1);
 
-  if(card.value==="W"||card.value==="+4"){
-    let c=prompt("Pilih warna: red/blue/green/yellow")
-    if(!c)return
-    currentColor=c
-  }else{
-    if(card.color!==currentColor && card.value!==discard.value) return
-    currentColor=card.color
-  }
+  let next=(data.turnIndex+1)%ids.length;
 
-  hand.splice(index,1)
-  applyEffect(card)
+  await update(ref(db,"rooms/"+roomId),{
+    discard:card,
+    turnIndex:next,
+    ["players/"+profile.id]:player
+  });
 
-  discard=card animateDiscard(card);
-
-
-  if(hand.length===1&&!players[myId].uno){
-    hand.push(randomCard())
-    hand.push(randomCard())
-  }
-
-  if(hand.length===0){
-    alert("Kamu Menang!")
-    startGame(mode)
-    return
-  }
-
-  nextTurn()
-  renderAll()
-  startTimer()
-  checkBot()
-}
-
-function applyEffect(card){
-  if(card.value==="R") direction*=-1
-  if(card.value==="S") nextTurn()
-  if(card.value==="+2") giveCards(2)
-  if(card.value==="+4") giveCards(4)
-}
-
-function animateDiscard(card){
-  const d=document.getElementById("discard");
-  d.style.transform="translate(-50%,-50%) scale(0.5)";
-  setTimeout(()=>{
-    d.style.transform="translate(-50%,-50%) scale(1)";
-  },150);
-}
-
-function giveCards(n){
-  const ids=Object.keys(players)
-  const next=ids[(turnIndex+direction+ids.length)%ids.length]
-  for(let i=0;i<n;i++) players[next].hand.push(randomCard())
-}
-
-function nextTurn(){
-  const total=Object.keys(players).length
-  turnIndex+=direction
-  if(turnIndex>=total)turnIndex=0
-  if(turnIndex<0)turnIndex=total-1
-  document.getElementById("arrow").innerText=direction===1?"↻":"↺"
-}
-
-function checkBot(){
-  const ids=Object.keys(players)
-  const current=ids[turnIndex]
-  if(players[current].bot){
-    setTimeout(()=>botPlay(current),1000)
+  if(player.hand.length===0){
+    alert(profile.name+" MENANG!");
+    if(data.mode==="ranked"){
+      profile.ranks["1v1"]+=30;
+      await set(ref(db,"players/"+profile.id),{
+        name:profile.name,
+        ranks:profile.ranks
+      });
+    }
+    await remove(ref(db,"rooms/"+roomId));
+    location.reload();
   }
 }
 
-function botPlay(id){
-  let hand=players[id].hand
-  let played=false
+window.quickCasual=async function(){
+  createRoom();
+};
 
-  for(let i=0;i<hand.length;i++){
-    if(hand[i].color===currentColor||hand[i].value===discard.value||hand[i].value==="W"||hand[i].value==="+4"){
-      discard=hand[i]
-      currentColor=hand[i].color
-      applyEffect(hand[i])
-      hand.splice(i,1)
-      played=true
-      break
+window.quickRanked1v1=async function(){
+  const code=generateRoomCode();
+  roomId=code;
+  isHost=true;
+
+  await set(ref(db,"rooms/"+code),{
+    mode:"ranked",
+    format:"1v1",
+    host:profile.id,
+    started:false,
+    turnIndex:0,
+    players:{}
+  });
+
+  joinRoom(code);
+};
+
+function generateDeck(){
+  const colors=["red","blue","green","yellow"];
+  const values=["0","1","2","3","4","5","6","7","8","9"];
+  let deck=[];
+  for(let c of colors){
+    for(let v of values){
+      deck.push({color:c,value:v});
     }
   }
+  return shuffle(deck);
+}
 
-  if(!played) hand.push(randomCard())
-
-  if(hand.length===0){
-    alert(players[id].name+" Menang!")
-    startGame(mode)
-    return
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
   }
-
-  nextTurn()
-  renderAll()
-  startTimer()
-  checkBot()
+  return a;
 }
 
-function renderAll(){
-  renderDiscard()
-  renderPlayers()
-}
-
-function renderDiscard(){
-  const d=document.getElementById("discard")
-  d.className="discard "+(discard.color||"black")
-  d.innerText=discard.value
-}
-
-function renderPlayers(){
-  const ids=Object.keys(players)
-  ids.forEach((id,i)=>{
-    const div=document.getElementById(id)
-    div.className="player "+getPos(id)
-    if(i===turnIndex)div.classList.add("turn")
-    div.innerHTML=`<div>${players[id].name} (${players[id].hand.length})</div>`
-
-    if(!players[id].bot){
-      players[id].hand.forEach((c,ind)=>{
-        div.innerHTML+=`<div class="card ${c.color}" onclick="playCard(${ind})">${c.value}</div>`
-      })
-    }else{
-      div.innerHTML+=`${'<div class="card back"></div>'.repeat(players[id].hand.length)}`
-    }
-  })
-}
-
-function getPos(id){
-  if(id==="player1")return"bottom"
-  if(id==="bot2")return"top"
-  if(id==="bot3")return"left"
-  if(id==="bot4")return"right"
+function renderPlayers(players){
+  const div=document.getElementById("players");
+  div.innerHTML="<b>Pemain:</b><br>";
+  Object.values(players).forEach(p=>{
+    div.innerHTML+=p.name+"<br>";
+  });
 }
 
 </script>
 </body>
-    </html>
+</html>
+
