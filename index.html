@@ -114,12 +114,17 @@ button{
 <body>
   
 <div class="modeSelect" id="menu">
-  <h2>UNO ULTIMATE</h2>
-  <button onclick="startGame('classic')">Offline Classic</button>
-  <button onclick="startGame('flip')">Offline Flip</button>
-  <button onclick="startOnline('classic')">Online Classic</button>
-  <button onclick="startOnline('flip')">Online Flip</button>
+  <h2>UNO ULTIMATE PRO</h2>
+
+  <input id="nameInput" placeholder="Masukkan Nama..." 
+  style="padding:10px;border-radius:8px;border:none;margin-bottom:10px;width:200px;">
+
+  <br>
+
+  <button onclick="startGameWithLogin('classic')">Offline Classic</button>
+  <button onclick="startGameWithLogin('flip')">Offline Flip</button>
 </div>
+
 
 <div class="table" id="game" style="display:none;">
   <div class="arrow" id="arrow">↻</div>
@@ -144,26 +149,33 @@ button{
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, update, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
 const firebaseConfig = {
-  apiKey: "ISI_CONFIG_KAMU",
-  authDomain: "ISI",
-  databaseURL: "ISI",
-  projectId: "ISI",
-  storageBucket: "ISI",
-  messagingSenderId: "ISI",
-  appId: "ISI"
+  apiKey: "AIzaSyBvd1DHwW8ObHX2RpQHVAC5ToiKWH-z0Cg",
+  authDomain: "uno-online-9ff2f.firebaseapp.com",
+  projectId: "uno-online-9ff2f",
+  storageBucket: "uno-online-9ff2f.firebasestorage.app",
+  messagingSenderId: "285267848462",
+  appId: "1:285267848462:web:da24cfb8d4ff04441b7b5f",
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// Firebase hanya aktif kalau config sudah kamu isi
+let db = null;
+let fb = null;
+
+if (firebaseConfig.apiKey !== "AIzaSyBvd1DHwW8ObHX2RpQHVAC5ToiKWH-z0Cg") {
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  fb = { ref, set, update, push, onValue, get };
+  console.log("Firebase Connected");
+} else {
+  console.log("Firebase belum diisi");
+}
 
 window.db = db;
-window.fb = { ref, set, update, push, onValue, get };
+window.fb = fb;
 </script>
 
 let online=false
@@ -171,6 +183,12 @@ let roomId=""
 let myIdOnline=""
 
 async function startOnline(selected){
+
+  if (!window.fb || !window.db) {
+    alert("Mode Online belum aktif. Isi Firebase config dulu.");
+    return;
+  }
+
   mode=selected
   online=true
 
@@ -211,6 +229,19 @@ let interval
 let flipState="light"
 let skinClass = player.skin==="gold" ? "goldCard" : c.color
 
+function startGameWithLogin(selected){
+  const nameInput = document.getElementById("nameInput");
+  let name = nameInput.value.trim();
+
+  if(!name){
+    alert("Masukkan nama dulu!");
+    return;
+  }
+
+  localStorage.setItem("unoPlayerName", name);
+
+  startGame(selected);
+}
 
 function listenRoom(){
   const {ref,onValue,update} = fb
@@ -269,11 +300,27 @@ fb.onValue(fb.ref(db,"rooms/"+roomId+"/chat"),(snap)=>{
 
 function startGame(selected){
   mode=selected
-  document.getElementById("menu").style.display="none"
-  document.getElementById("game").style.display="block"
+  const menu = document.getElementById("menu");
+  const game = document.getElementById("game");
+
+  menu.style.opacity="0";
+  setTimeout(()=>{
+  menu.style.display="none";
+  game.style.display="block";
+  game.style.opacity="0";
+  setTimeout(()=>{
+    game.style.opacity="1";
+  },50);
+  },300);
+
 
   players={
-    player1:{name:"Kamu",hand:genHand(),bot:false,uno:false},
+    player1:{
+  name:localStorage.getItem("unoPlayerName") || "Kamu",
+  hand:genHand(),
+  bot:false,
+  uno:false
+},
     bot2:{name:"Bot A",hand:genHand(),bot:true,uno:false},
     bot3:{name:"Bot B",hand:genHand(),bot:true,uno:false},
     bot4:{name:"Bot C",hand:genHand(),bot:true,uno:false}
@@ -342,7 +389,8 @@ function playCard(index){
   hand.splice(index,1)
   applyEffect(card)
 
-  discard=card
+  discard=card animateDiscard(card);
+
 
   if(hand.length===1&&!players[myId].uno){
     hand.push(randomCard())
@@ -366,6 +414,14 @@ function applyEffect(card){
   if(card.value==="S") nextTurn()
   if(card.value==="+2") giveCards(2)
   if(card.value==="+4") giveCards(4)
+}
+
+function animateDiscard(card){
+  const d=document.getElementById("discard");
+  d.style.transform="translate(-50%,-50%) scale(0.5)";
+  setTimeout(()=>{
+    d.style.transform="translate(-50%,-50%) scale(1)";
+  },150);
 }
 
 function giveCards(n){
